@@ -31,3 +31,16 @@ export const whiteboard: Manifest = {
 
 // @ts-expect-error: 'needed' or 'optional', nothing else.
 export const sometimes: Manifest = { id: 'sometimes', name: 'Sometimes', version: '1.0.0', permissions: ['files'], files: 'sometimes' }
+
+// A tool call's idempotency key: an 'inside' tool keeps what it did by step.
+import type { ToolCallMeta } from '../index.js'
+const done = new Map<string, unknown>()
+export function addOnce(meta: ToolCallMeta | undefined, add: () => unknown) {
+  const step = meta?.['ava/step']
+  if (step && done.has(step)) return done.get(step)
+  const result = add()
+  if (step) done.set(step, result)
+  return result
+}
+// @ts-expect-error: the key is 'ava/step'.
+export const wrong: ToolCallMeta = { 'ava/stepId': 'x' }

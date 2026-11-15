@@ -27,6 +27,14 @@ Up to 0.1.0 the package was `@addiscorp/ava-addon`. It's the same SDK under Ava'
 - Add-ons are published through the signed catalogue at [avacanada/ava-catalogue](https://github.com/avacanada/ava-catalogue).
 - [avacanada/ava-addon-hello](https://github.com/avacanada/ava-addon-hello) is the example to copy.
 
+## Tool calls Ava makes again
+Ava journals every step of a reply, so a reply cut off by a crash, a quit or an update carries on when she starts again. A tool call that had started but has no recorded result is decided by the tool's `effect`:
+- `read`: Ava may call it again.
+- `inside`: Ava calls it again, with the same idempotency key: `params._meta["ava/step"]` on `tools/call` (`ToolCallMeta`). If your tool has already done that step, answer as you did the first time instead of doing it twice (don't add the same note again).
+- `outside`: never called again by itself. Ava tells the person she may or may not have done it, and asks whether to try again.
+
+The key is there on every call Ava journals, and on an approved `outside` call (the action's id). Older Ava builds don't send it, so treat it as optional.
+
 ## Releasing
 Bump `version` in `package.json` and merge to `main`. `publish-sdk.yml` then publishes to npm through trusted publishing, in the `release` environment, with no npm token. It publishes only versions that aren't on npm yet.
 
