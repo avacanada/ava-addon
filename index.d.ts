@@ -60,8 +60,22 @@ export type AvaClient = {
 /** Ava's client, as /ava.js set it up. Throws outside Ava. */
 export function ava(): AvaClient
 
-/** What one of an add-on's tools does: reads, changes its own files, or reaches outside (Ava asks the person). */
+/**
+ * What one of an add-on's tools does: reads, changes its own files, or reaches outside (Ava asks the person).
+ * It also decides what happens when Ava stops in the middle of a call (a crash, a quit, an update) and picks
+ * her reply up again: a 'read' call may be made again; an 'inside' call is made again only if no result was
+ * recorded, with the same `ava/step` key (see `ToolCallMeta`); an 'outside' call is never made again by itself.
+ */
 export type Effect = 'read' | 'inside' | 'outside'
+
+/** The `_meta` key on Ava's `tools/call` requests that carries the call's idempotency key. */
+export type StepKey = 'ava/step'
+
+/**
+ * `params._meta` on a `tools/call` request from Ava. `ava/step` is the same every time Ava makes the same call:
+ * an 'inside' tool that sees a step it has already done should answer as it did then, without doing it twice.
+ */
+export type ToolCallMeta = { [K in StepKey]?: string }
 export type Permission = 'files' | 'storage' | 'tools' | 'network'
 /**
  * With the 'files' permission, whether the add-on's tools need a picked folder or file:
