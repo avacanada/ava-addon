@@ -29,5 +29,30 @@ export const whiteboard: Manifest = {
   tools: [{ name: 'draw', description: 'Draw a shape.', effect: 'inside', input_schema: { type: 'object' } }],
 }
 
+// One tool with actions, importing from the Mac's Calendar into its own folder.
+export const calendar: Manifest = {
+  id: 'calendar',
+  name: 'Calendar',
+  version: '1.0.0',
+  permissions: ['files', 'storage', 'tools', 'device'],
+  device: ['calendar'],
+  egress: [],
+  tools: [{
+    name: 'calendar', description: 'The calendar.', effect: 'inside',
+    input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['list', 'add'] } }, required: ['action'] },
+    actions: [{ name: 'list', effect: 'read' }, { name: 'add', effect: 'inside', verb: 'Add' }],
+  }],
+}
+
+export async function importEvents() {
+  const { folder, records } = await ava().device.read('calendar')
+  return records.map(e => `${folder}/${e.calendar}/${e.title} ${e.starts}`)
+}
+
+// @ts-expect-error: a change needs a verb for its card.
+export const noVerb: Manifest['tools'] = [{ name: 'x', description: 'x', effect: 'inside', input_schema: { type: 'object' }, actions: [{ name: 'add', effect: 'inside' }] }]
+// @ts-expect-error: never a generic OK.
+export const okVerb: Manifest['tools'] = [{ name: 'x', description: 'x', effect: 'inside', input_schema: { type: 'object' }, actions: [{ name: 'add', effect: 'inside', verb: 'OK' }] }]
+
 // @ts-expect-error: 'needed' or 'optional', nothing else.
 export const sometimes: Manifest = { id: 'sometimes', name: 'Sometimes', version: '1.0.0', permissions: ['files'], files: 'sometimes' }
