@@ -55,14 +55,65 @@ export type AvaClient = {
     /** A request to one of the add-on's declared hosts, through Ava. */
     fetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string | null }): Promise<{ status: number; headers: Record<string, string>; body: string }>
   }
+  /**
+   * This computer's own apps (needs the 'device' permission and the source in `device`).
+   * Sync is one way: import into a folder of the add-on's own (`folder`, "From your Mac"),
+   * whatever platform it came from. Writing back happens only inside an approved card.
+   */
+  device: {
+    status(source: DeviceSource): Promise<DeviceStatus>
+    /** Every record of `source` (calendar: `from`/`to` in unix seconds; default a month back to a year ahead). Shows the platform's permission prompt if it hasn't asked. */
+    read<S extends DeviceSource>(source: S, options?: { from?: number; to?: number }): Promise<{ folder: string; records: DeviceRecord[S][] }>
+    /** One change the person approved on a card: `step` is that call's `_meta['ava/step']`. Refused at any other time. */
+    write(source: DeviceSource, change: DeviceChange, step: string): Promise<Record<string, unknown>>
+  }
 }
+
+/** One of this computer's own apps an add-on may import from. */
+export type DeviceSource = 'calendar' | 'contacts' | 'reminders' | 'notes'
+
+/** Whether there's anything to import here, whether Ava may read it now, and where imports go. */
+export type DeviceStatus = { available: boolean; access: 'allowed' | 'notAsked' | 'denied' | 'missing'; folder: string }
+
+/** What an import gives, per source. Times are local: "2026-11-12 10:00", or "2026-11-12" for a whole day. */
+export type DeviceRecord = {
+  calendar: { id: string; title: string; starts: string; ends: string; all_day: boolean; location: string | null; calendar: string }
+  contacts: { name: string; nickname: string; organization: string; phones: { label: string; number: string }[]; emails: string[]; birthday: string | null }
+  reminders: { id: string; title: string; list: string; due: string | null; notes: string | null; done: boolean }
+  notes: { title: string; folder: string; modified: string; text: string }
+}
+
+/** What can be written back (macOS today): new events, reminders and notes, and ticking off a reminder. */
+export type DeviceChange =
+  | { kind: 'add'; title: string; starts: string; ends?: string; location?: string }
+  | { kind: 'add'; title: string; due?: string; list?: string; notes?: string }
+  | { kind: 'complete'; id: string }
+  | { kind: 'add'; title: string; text: string; folder?: string }
 
 /** Ava's client, as /ava.js set it up. Throws outside Ava. */
 export function ava(): AvaClient
 
 /** What one of an add-on's tools does: reads, changes its own files, or reaches outside (Ava asks the person). */
 export type Effect = 'read' | 'inside' | 'outside'
-export type Permission = 'files' | 'storage' | 'tools' | 'network'
+export type Permission = 'files' | 'storage' | 'tools' | 'network' | 'device'
+
+/** The words an approval card's button may say: what happens when the person taps it. Never a generic OK. */
+export type Verb = 'Add' | 'Save' | 'Delete' | 'Done' | 'Send' | 'Import' | 'Remove' | 'Open' | 'Purchase'
+
+/**
+ * One action of a tool that has several (`calendar(action: 'add', …)`): reads run at once;
+ * a change ('inside' or 'outside') waits for the person's card, whose button says `verb`.
+ */
+export type Action =
+  | { name: string; effect: 'read'; verb?: never }
+  | { name: string; effect: 'inside' | 'outside'; verb: Verb }
+
+/**
+ * A tool. With `actions`, its `effect` is the strongest of theirs and its input_schema has a
+ * required string `action` whose enum is exactly their names, in order. A tool named like its
+ * add-on is the add-on's one tool, and Ava sees it by that name alone (`calendar`).
+ */
+export type Tool = { name: string; description: string; effect: Effect; input_schema: Record<string, unknown>; actions?: Action[] }
 /**
  * With the 'files' permission, whether the add-on's tools need a picked folder or file:
  * 'needed' (the default) means Ava offers them only once the person picked one;
@@ -85,5 +136,7 @@ export type Manifest = {
   files?: FilesUse
   /** Hosts it may reach through `ava.net.fetch` (needs 'network'). */
   egress?: string[]
-  tools?: { name: string; description: string; effect: Effect; input_schema: Record<string, unknown> }[]
+  tools?: Tool[]
+  /** With the 'device' permission: the computer's apps it imports from. Never with 'network'. */
+  device?: DeviceSource[]
 }
